@@ -2,190 +2,258 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>خريطة الخدمات (نسخة محسنة)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>خريطة الخدمات الاحترافية</title>
 
-    <!-- استيراد مكتبة Leaflet للخرائط -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- 1. استيراد المكتبات -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css" />
 
     <style>
-        /* تنسيق أساسي للصفحة */
-        body {
-            font-family: 'Arial', sans-serif;
+        /* 2. التنسيق الاحترافي والمحسّن */
+        :root {
+            --primary-color: #007bff;
+            --success-color: #28a745;
+            --error-color: #dc3545;
+            --info-color: #17a2b8;
+            --shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        body, html {
             margin: 0;
             padding: 0;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
+            height: 100%;
+            width: 100%;
+            font-family: 'Tajawal', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
         }
-        /* حاوية الخريطة يجب أن تأخذ ارتفاع معين */
+
         #map {
             height: 100%;
             width: 100%;
+            z-index: 1;
         }
-        /* تنسيق شريط الأزرار */
+
+        /* حاوية الأزرار العائمة */
         .controls {
-            padding: 10px;
-            background-color: #f8f8f8;
-            border-bottom: 1px solid #ddd;
-            text-align: center;
-            z-index: 1000; /* للتأكد من أنها فوق الخريطة */
-        }
-        .controls button {
-            padding: 10px 15px;
-            margin: 5px;
-            font-size: 16px;
-            cursor: pointer;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            background-color: #fff;
-        }
-        .controls button:hover {
-            background-color: #e9e9e9;
-        }
-        #loader {
-            display: none; /* مخفي بشكل افتراضي */
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            border: 8px solid #f3f3f3;
-            border-top: 8px solid #3498db;
+            top: 15px;
+            right: 15px; /* سيتم قلبه تلقائياً لليسار بسبب dir="rtl" */
+            z-index: 1000;
+            display: flex;
+            flex-direction: column; /* الوضع الافتراضي للهواتف */
+            gap: 8px;
+        }
+
+        .controls button {
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #ddd;
+            color: #333;
+            padding: 10px 15px;
+            width: auto; /* عرض تلقائي */
+            white-space: nowrap; /* منع النص من النزول لسطر جديد */
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            font-size: 16px;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 10px;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .controls button:hover {
+            background-color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+        }
+
+        .controls button i {
+            font-size: 1.2em;
+            width: 20px;
+            text-align: center;
+            color: var(--primary-color);
+        }
+
+        /* تصميم متجاوب للأزرار على الشاشات الكبيرة */
+        @media (min-width: 768px) {
+            .controls {
+                flex-direction: row; /* تحويل الأزرار إلى صف أفقي */
+                left: 50%; /* توسيط المجموعة */
+                transform: translateX(50%); /* تصحيح التوسيط بسبب dir=rtl */
+                right: auto;
+            }
+        }
+        
+        /* أيقونة موقع المستخدم */
+        .user-location-icon {
+            background-color: rgba(0, 123, 255, 0.2);
+            border: 2px solid var(--primary-color);
             border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            animation: spin 2s linear infinite;
-            z-index: 2000;
+            animation: pulse 2s infinite;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.4); }
+            70% { box-shadow: 0 0 0 15px rgba(0, 123, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
         }
+        
+        /* أيقونات مخصصة للعلامات على الخريطة */
+        .map-marker-icon {
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 50% 50% 50% 0; /* شكل دمعة */
+            transform: rotate(-45deg);
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow);
+            border: 2px solid white;
+        }
+        .map-marker-icon i {
+            transform: rotate(45deg); /* إعادة الأيقونة لوضعها الصحيح */
+            font-size: 16px;
+        }
+        .map-marker-icon.hotel { background-color: #007bff; }
+        .map-marker-icon.fuel { background-color: #ffc107; }
+        .map-marker-icon.camping { background-color: #28a745; }
+
+
+        /* نظام الإشعارات */
+        #notification-container { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
+        .toast { padding: 15px 25px; border-radius: 8px; color: #fff; font-size: 16px; box-shadow: var(--shadow); opacity: 0; transform: translateY(-20px); animation: fadeIn 0.5s forwards; }
+        .toast.success { background-color: var(--success-color); }
+        .toast.error { background-color: var(--error-color); }
+        .toast.info { background-color: var(--info-color); }
+        @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+
     </style>
 </head>
 <body>
 
-    <div class="controls">
-        <button id="findHotels">البحث عن فنادق</button>
-        <button id="findGasStations">البحث عن محطات وقود</button>
-        <button id="findCamping">البحث عن أماكن تخييم</button>
-    </div>
-
     <div id="map"></div>
-    <div id="loader"></div>
-
+    <div class="controls">
+        <button id="findHotels"><i class="fa-solid fa-hotel"></i>البحث عن فنادق</button>
+        <button id="findGasStations"><i class="fa-solid fa-gas-pump"></i>البحث عن وقود</button>
+        <button id="findCamping"><i class="fa-solid fa-campground"></i>البحث عن تخييم</button>
+    </div>
+    <div id="notification-container"></div>
+    
+    <!-- 3. استيراد سكربتات الجافاسكريبت -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
     <script>
-        // تهيئة الخريطة وتحديد عرض افتراضي (في حال لم يسمح المستخدم بالموقع)
-        const map = L.map('map').setView([24.7136, 46.6753], 13); // الرياض كمركز افتراضي
-
-        // إضافة طبقة الخريطة الأساسية من OpenStreetMap
+        // 4. الكود البرمجي
+        const map = L.map('map').setView([36.775, 3.059], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        // طبقة خاصة لوضع علامات الأماكن (POIs) لتسهيل حذفها لاحقاً
-        const poiLayer = L.layerGroup().addTo(map);
-        const loader = document.getElementById('loader');
+        const markers = L.markerClusterGroup();
+        map.addLayer(markers);
 
-        // --- 1. تحديد موقع المستخدم ---
-        map.locate({setView: true, maxZoom: 15});
-
-        function onLocationFound(e) {
-            const radius = e.accuracy;
-            L.marker(e.latlng).addTo(map)
-                .bindPopup("<b>أنت هنا</b>").openPopup();
-            L.circle(e.latlng, radius).addTo(map);
+        const notificationContainer = document.getElementById('notification-container');
+        function showNotification(message, type = 'info', duration = 4000) {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            notificationContainer.appendChild(toast);
+            setTimeout(() => toast.remove(), duration);
         }
 
-        function onLocationError(e) {
-            alert("لم نتمكن من الوصول لموقعك. سيتم عرض خريطة الرياض كوضع افتراضي.");
-        }
+        map.locate({setView: true, maxZoom: 16});
+        map.on('locationfound', e => {
+            const userIcon = L.divIcon({ className: 'user-location-icon', iconSize: [20, 20] });
+            L.marker(e.latlng, { icon: userIcon }).addTo(map).bindPopup("<b>أنت هنا</b>").openPopup();
+            showNotification('تم تحديد موقعك بنجاح.', 'success');
+        });
+        map.on('locationerror', () => showNotification('لم نتمكن من الوصول لموقعك.', 'error'));
 
-        map.on('locationfound', onLocationFound);
-        map.on('locationerror', onLocationError);
+        let isFetching = false;
+        async function fetchAndDisplayPois(queryType, queries, iconClass, searchRadius = 10000) {
+            if (isFetching) {
+                showNotification('جاري تنفيذ بحث آخر، يرجى الانتظار.', 'info');
+                return;
+            }
+            isFetching = true;
+            showNotification(`جاري البحث عن ${queryType}...`, 'info');
+            markers.clearLayers();
 
+            const center = map.getCenter();
+            let queryParts = queries.map(q => `
+                (node(around:${searchRadius},${center.lat},${center.lng})["${q.key}"="${q.value}"];
+                 way(around:${searchRadius},${center.lat},${center.lng})["${q.key}"="${q.value}"];
+                 relation(around:${searchRadius},${center.lat},${center.lng})["${q.key}"="${q.value}"];);
+            `).join('');
 
-        // --- 2. دالة لجلب البيانات من Overpass API (نسخة محسنة) ---
-        async function fetchPois(queryType, queries) {
-            // مسح العلامات القديمة قبل البحث الجديد
-            poiLayer.clearLayers();
-            loader.style.display = 'block'; // إظهار مؤشر التحميل
-
-            // الحصول على حدود الخريطة الحالية لإجراء البحث فيها فقط
-            const bounds = map.getBounds().toBBoxString();
-
-            // بناء استعلام Overpass بناءً على مصفوفة الاستعلامات
-            let queryParts = '';
-            queries.forEach(q => {
-                queryParts += `
-                  node["${q.key}"="${q.value}"](${bounds});
-                  way["${q.key}"="${q.value}"](${bounds});
-                  relation["${q.key}"="${q.value}"](${bounds});
-                `;
-            });
-
-            const query = `
-                [out:json][timeout:25];
-                (
-                  ${queryParts}
-                );
-                out center;
-            `;
-            
-            const url = 'https://overpass-api.de/api/interpreter';
+            const overpassQuery = `[out:json][timeout:30];(${queryParts});out center;`;
+            const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
 
             try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    body: "data=" + encodeURIComponent(query)
-                });
+                const response = await fetch(url);
                 const data = await response.json();
 
                 if (data.elements.length === 0) {
-                    alert(`لم يتم العثور على ${queryType} في هذه المنطقة.`);
+                    showNotification(`لم يتم العثور على ${queryType} ضمن نطاق ${searchRadius/1000} كم.`, 'error');
+                    return;
                 }
 
-                // إضافة العلامات الجديدة إلى الطبقة
                 data.elements.forEach(element => {
-                    const lat = element.lat || element.center.lat;
-                    const lon = element.lon || element.center.lon;
-                    const name = element.tags.name || `(${queryType} بدون اسم)`;
-                    
-                    L.marker([lat, lon]).addTo(poiLayer)
-                        .bindPopup(`<b>${name}</b>`);
+                    if (element.center || (element.lat && element.lon)) {
+                        const lat = element.lat || element.center.lat;
+                        const lon = element.lon || element.center.lon;
+                        const name = element.tags.name || `${queryType} (بدون اسم)`;
+                        const directionsLink = `https://www.google.com/maps?daddr=${lat},${lon}`;
+                        
+                        const popupContent = `<div style="text-align:right; font-family:inherit;"><b>${name}</b><br><a href="${directionsLink}" target="_blank" style="color:var(--primary-color);">احصل على الاتجاهات</a></div>`;
+                        
+                        // *** إنشاء الأيقونة المخصصة ***
+                        const customIcon = L.divIcon({
+                            html: `<div class="map-marker-icon ${iconClass.bg}"><i class="${iconClass.icon}"></i></div>`,
+                            className: '', // لا نريد فئات إضافية
+                            iconSize: [30, 30],
+                            iconAnchor: [15, 30] // نقطة تثبيت الأيقونة
+                        });
+
+                        const marker = L.marker([lat, lon], { icon: customIcon }).bindPopup(popupContent);
+                        markers.addLayer(marker);
+                    }
                 });
+                showNotification(`تم العثور على ${data.elements.length} من ${queryType}.`, 'success');
 
             } catch (error) {
-                console.error('حدث خطأ:', error);
-                alert('حدث خطأ أثناء جلب البيانات. الرجاء المحاولة مرة أخرى.');
+                showNotification('حدث خطأ أثناء الاتصال بالخادم. حاول مجدداً.', 'error');
             } finally {
-                loader.style.display = 'none'; // إخفاء مؤشر التحميل
+                isFetching = false;
             }
         }
 
-        // --- 3. ربط الأزرار بالدوال (بصيغة جديدة) ---
         document.getElementById('findHotels').addEventListener('click', () => {
-            fetchPois('فنادق', [{key: 'tourism', value: 'hotel'}]);
+            fetchAndDisplayPois('فنادق', 
+                [{key: 'tourism', value: 'hotel'}], 
+                { bg: 'hotel', icon: 'fa-solid fa-hotel' }
+            );
         });
-
         document.getElementById('findGasStations').addEventListener('click', () => {
-            // سنبحث عن الوسم الرئيسي والوسوم البديلة
-            fetchPois('محطات وقود', [
-                {key: 'amenity', value: 'fuel'},
-                {key: 'shop', value: 'petrol'} // وسم بديل
-            ]);
+            fetchAndDisplayPois('محطات وقود', 
+                [{key: 'amenity', value: 'fuel'}],
+                { bg: 'fuel', icon: 'fa-solid fa-gas-pump' }
+            );
         });
-
         document.getElementById('findCamping').addEventListener('click', () => {
-            fetchPois('أماكن تخييم', [
-                {key: 'tourism', value: 'camp_site'},
-                {key: 'tourism', value: 'caravan_site'} // وسم بديل لمواقف الكارافان
-            ]);
+            fetchAndDisplayPois('أماكن تخييم', 
+                [{key: 'tourism', value: 'camp_site'}, {key: 'tourism', value: 'caravan_site'}],
+                { bg: 'camping', icon: 'fa-solid fa-campground' }
+            );
         });
-
     </script>
-
 </body>
 </html>
