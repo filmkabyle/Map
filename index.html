@@ -5,14 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>خريطة الخدمات الاحترافية</title>
 
-    <!-- 1. استيراد المكتبات -->
+    <!-- مكتبات Leaflet الأساسية -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css" />
 
     <style>
-        /* 2. التنسيق الاحترافي والمحسّن */
         :root {
             --primary-color: #007bff;
             --success-color: #28a745;
@@ -36,24 +35,22 @@
             z-index: 1;
         }
 
-        /* حاوية الأزرار العائمة */
         .controls {
             position: absolute;
             top: 15px;
-            right: 15px; /* سيتم قلبه تلقائياً لليسار بسبب dir="rtl" */
+            right: 15px;
             z-index: 1000;
             display: flex;
-            flex-direction: column; /* الوضع الافتراضي للهواتف */
+            flex-direction: column;
             gap: 8px;
         }
 
-        .controls button {
+        .controls button, .controls select {
             background: rgba(255, 255, 255, 0.95);
             border: 1px solid #ddd;
             color: #333;
             padding: 10px 15px;
-            width: auto; /* عرض تلقائي */
-            white-space: nowrap; /* منع النص من النزول لسطر جديد */
+            white-space: nowrap;
             border-radius: 8px;
             box-shadow: var(--shadow);
             cursor: pointer;
@@ -79,17 +76,15 @@
             color: var(--primary-color);
         }
 
-        /* تصميم متجاوب للأزرار على الشاشات الكبيرة */
         @media (min-width: 768px) {
             .controls {
-                flex-direction: row; /* تحويل الأزرار إلى صف أفقي */
-                left: 50%; /* توسيط المجموعة */
-                transform: translateX(50%); /* تصحيح التوسيط بسبب dir=rtl */
+                flex-direction: row;
+                left: 50%;
+                transform: translateX(50%);
                 right: auto;
             }
         }
-        
-        /* أيقونة موقع المستخدم */
+
         .user-location-icon {
             background-color: rgba(0, 123, 255, 0.2);
             border: 2px solid var(--primary-color);
@@ -102,12 +97,11 @@
             70% { box-shadow: 0 0 0 15px rgba(0, 123, 255, 0); }
             100% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
         }
-        
-        /* أيقونات مخصصة للعلامات على الخريطة */
+
         .map-marker-icon {
             background-color: var(--primary-color);
             color: white;
-            border-radius: 50% 50% 50% 0; /* شكل دمعة */
+            border-radius: 50% 50% 50% 0;
             transform: rotate(-45deg);
             width: 30px;
             height: 30px;
@@ -118,15 +112,13 @@
             border: 2px solid white;
         }
         .map-marker-icon i {
-            transform: rotate(45deg); /* إعادة الأيقونة لوضعها الصحيح */
+            transform: rotate(45deg);
             font-size: 16px;
         }
         .map-marker-icon.hotel { background-color: #007bff; }
         .map-marker-icon.fuel { background-color: #ffc107; }
         .map-marker-icon.camping { background-color: #28a745; }
 
-
-        /* نظام الإشعارات */
         #notification-container { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
         .toast { padding: 15px 25px; border-radius: 8px; color: #fff; font-size: 16px; box-shadow: var(--shadow); opacity: 0; transform: translateY(-20px); animation: fadeIn 0.5s forwards; }
         .toast.success { background-color: var(--success-color); }
@@ -142,20 +134,45 @@
     <div class="controls">
         <button id="findHotels"><i class="fa-solid fa-hotel"></i>البحث عن فنادق</button>
         <button id="findGasStations"><i class="fa-solid fa-gas-pump"></i>البحث عن وقود</button>
-        <button id="findCamping"><i class="fa-solid fa-campground"></i>البحث عن تخييم</button>
+        <button id="findCamping"><i class="fa-solid fa-campground"></i>تخييم</button>
+        <select id="basemapSwitcher">
+            <option value="osm">خريطة عادية</option>
+            <option value="satellite">قمر صناعي</option>
+            <option value="topo">تضاريس</option>
+        </select>
     </div>
     <div id="notification-container"></div>
-    
-    <!-- 3. استيراد سكربتات الجافاسكريبت -->
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
     <script>
-        // 4. الكود البرمجي
-        const map = L.map('map').setView([36.775, 3.059], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+        const baseLayers = {
+            osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }),
+            satellite: L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+                maxZoom: 20,
+                subdomains:['mt0','mt1','mt2','mt3'],
+                attribution: '© Google'
+            }),
+            topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                maxZoom: 17,
+                attribution: '© OpenTopoMap'
+            })
+        };
+
+        const map = L.map('map', {
+            center: [36.775, 3.059],
+            zoom: 12,
+            layers: [baseLayers.osm]
+        });
+
+        document.getElementById('basemapSwitcher').addEventListener('change', e => {
+            const selected = e.target.value;
+            Object.values(baseLayers).forEach(layer => map.removeLayer(layer));
+            baseLayers[selected].addTo(map);
+        });
 
         const markers = L.markerClusterGroup();
         map.addLayer(markers);
@@ -202,7 +219,7 @@
                 const data = await response.json();
 
                 if (data.elements.length === 0) {
-                    showNotification(`لم يتم العثور على ${queryType} ضمن نطاق ${searchRadius/1000} كم.`, 'error');
+                    showNotification(`لم يتم العثور على ${queryType} ضمن ${searchRadius/1000} كم.`, 'error');
                     return;
                 }
 
@@ -212,15 +229,14 @@
                         const lon = element.lon || element.center.lon;
                         const name = element.tags.name || `${queryType} (بدون اسم)`;
                         const directionsLink = `https://www.google.com/maps?daddr=${lat},${lon}`;
-                        
+
                         const popupContent = `<div style="text-align:right; font-family:inherit;"><b>${name}</b><br><a href="${directionsLink}" target="_blank" style="color:var(--primary-color);">احصل على الاتجاهات</a></div>`;
-                        
-                        // *** إنشاء الأيقونة المخصصة ***
+
                         const customIcon = L.divIcon({
                             html: `<div class="map-marker-icon ${iconClass.bg}"><i class="${iconClass.icon}"></i></div>`,
-                            className: '', // لا نريد فئات إضافية
+                            className: '',
                             iconSize: [30, 30],
-                            iconAnchor: [15, 30] // نقطة تثبيت الأيقونة
+                            iconAnchor: [15, 30]
                         });
 
                         const marker = L.marker([lat, lon], { icon: customIcon }).bindPopup(popupContent);
