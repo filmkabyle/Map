@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>خريطة الخدمات (نسخة محسنة)</title>
+
+    <!-- استيراد مكتبة Leaflet للخرائط -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <style>
+        /* تنسيق أساسي للصفحة */
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        /* حاوية الخريطة يجب أن تأخذ ارتفاع معين */
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        /* تنسيق شريط الأزرار */
+        .controls {
+            padding: 10px;
+            background-color: #f8f8f8;
+            border-bottom: 1px solid #ddd;
+            text-align: center;
+            z-index: 1000; /* للتأكد من أنها فوق الخريطة */
+        }
+        .controls button {
+            padding: 10px 15px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #fff;
+        }
+        .controls button:hover {
+            background-color: #e9e9e9;
+        }
+        #loader {
+            display: none; /* مخفي بشكل افتراضي */
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #3498db;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 2s linear infinite;
+            z-index: 2000;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <button id="findHotels">البحث عن فنادق</button>
+        <button id="findGasStations">البحث عن محطات وقود</button>
+        <button id="findCamping">البحث عن أماكن تخييم</button>
+    </div>
+
+    <div id="map"></div>
+    <div id="loader"></div>
+
+
+    <script>
+        // تهيئة الخريطة وتحديد عرض افتراضي (في حال لم يسمح المستخدم بالموقع)
+        const map = L.map('map').setView([24.7136, 46.6753], 13); // الرياض كمركز افتراضي
+
+        // إضافة طبقة الخريطة الأساسية من OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // طبقة خاصة لوضع علامات الأماكن (POIs) لتسهيل حذفها لاحقاً
+        const poiLayer = L.layerGroup().addTo(map);
+        const loader = document.getElementById('loader');
+
+        // --- 1. تحديد موقع المستخدم ---
+        map.locate({setView: true, maxZoom: 15});
+
+        function onLocationFound(e) {
+            const radius = e.accuracy;
+            L.marker(e.latlng).addTo(map)
+                .bindPopup("<b>أنت هنا</b>").openPopup();
+            L.circle(e.latlng, radius).addTo(map);
+        }
+
+        function onLocationError(e) {
+            alert("لم نتمكن من الوصول لموقعك. سيتم عرض خريطة الرياض كوضع افتراضي.");
+        }
+
+        map.on('locationfound', onLocationFound);
+        map.on('locationerror', onLocationError);
+
+
+        // --- 2. دالة لجلب البيانات من Overpass API (نسخة محسنة) ---
+        async function fetchPois(queryType, queries) {
+            // مسح العلامات القديمة قبل البحث الجديد
+            poiLayer.clearLayers();
+            loader.style.display = 'block'; // إظهار مؤشر التحميل
+
+            // الحصول على حدود الخريطة الحالية لإجراء البحث فيها فقط
+            const bounds = map.getBounds().toBBoxString();
+
+            // بناء استعلام Overpass بناءً على مصفوفة الاستعلامات
+            let queryParts = '';
+            queries.forEach(q => {
+                queryParts += `
+                  node["${q.key}"="${q.value}"](${bounds});
+                  way["${q.key}"="${q.value}"](${bounds});
+                  relation["${q.key}"="${q.value}"](${bounds});
+                `;
+            });
+
+            const query = `
+                [out:json][timeout:25];
+                (
+                  ${queryParts}
+                );
+                out center;
+            `;
+            
+            const url = 'https://overpass-api.de/api/interpreter';
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: "data=" + encodeURIComponent(query)
+                });
+                const data = await response.json();
+
+                if (data.elements.length === 0) {
+                    alert(`لم يتم العثور على ${queryType} في هذه المنطقة.`);
+                }
+
+                // إضافة العلامات الجديدة إلى الطبقة
+                data.elements.forEach(element => {
+                    const lat = element.lat || element.center.lat;
+                    const lon = element.lon || element.center.lon;
+                    const name = element.tags.name || `(${queryType} بدون اسم)`;
+                    
+                    L.marker([lat, lon]).addTo(poiLayer)
+                        .bindPopup(`<b>${name}</b>`);
+                });
+
+            } catch (error) {
+                console.error('حدث خطأ:', error);
+                alert('حدث خطأ أثناء جلب البيانات. الرجاء المحاولة مرة أخرى.');
+            } finally {
+                loader.style.display = 'none'; // إخفاء مؤشر التحميل
+            }
+        }
+
+        // --- 3. ربط الأزرار بالدوال (بصيغة جديدة) ---
+        document.getElementById('findHotels').addEventListener('click', () => {
+            fetchPois('فنادق', [{key: 'tourism', value: 'hotel'}]);
+        });
+
+        document.getElementById('findGasStations').addEventListener('click', () => {
+            // سنبحث عن الوسم الرئيسي والوسوم البديلة
+            fetchPois('محطات وقود', [
+                {key: 'amenity', value: 'fuel'},
+                {key: 'shop', value: 'petrol'} // وسم بديل
+            ]);
+        });
+
+        document.getElementById('findCamping').addEventListener('click', () => {
+            fetchPois('أماكن تخييم', [
+                {key: 'tourism', value: 'camp_site'},
+                {key: 'tourism', value: 'caravan_site'} // وسم بديل لمواقف الكارافان
+            ]);
+        });
+
+    </script>
+
+</body>
+</html>
